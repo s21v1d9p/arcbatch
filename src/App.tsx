@@ -323,7 +323,7 @@ function App() {
               ) : (
                 <div className="csv-input">
                   <label htmlFor="csv-text">Payout CSV</label>
-                  <p>One recipient per line as address,amount. A header row is optional. Up to 25 lines.</p>
+                  <p>One recipient per line as address,amount. A header row is optional. Up to 25 recipients.</p>
                   <textarea
                     id="csv-text"
                     value={csv}
@@ -429,7 +429,7 @@ function App() {
             <h2>How it works</h2>
           </div>
           <div className="explainer-grid">
-            <div><h3>Add recipients</h3><p>Type them in or paste a CSV. The app doesn't store your list. It is sent through this site's RPC proxy to Arc for the gas estimate, and addresses and amounts become public once the payout is sent.</p></div>
+            <div><h3>Add recipients</h3><p>Type them in or paste a CSV. The app doesn't store your list. It is sent through this site's RPC proxy to Arc for the gas estimate (or straight to Arc's public RPC if the proxy is down), and addresses and amounts become public once the payout is sent.</p></div>
             <div><h3>Approve one transaction</h3><p>You see the total and the gas estimate before your wallet asks you to sign. If any transfer fails, the whole batch is reverted.</p></div>
             <div><h3>Share the receipt</h3><p>The receipt link reads the payment events from Arc RPC and links to Arc Explorer, so anyone can check the payout there.</p></div>
           </div>

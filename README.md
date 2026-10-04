@@ -27,8 +27,8 @@ The first mainnet payout went through the live app and sent 0.01 USDC to two add
 ## How it works
 
 1. Add recipients by hand or paste a CSV with `address,amount` lines. A header row is optional.
-2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. The app doesn't store the list. When you click Review batch, it is sent through this site's `/arc-rpc` proxy to Arc's public RPC for the gas estimate.
-3. Connect a wallet. Before you can confirm, the app checks that you are on Arc mainnet, that the contract address holds the expected contract code, and that your balance covers the total plus gas.
+2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. It doesn't store the list.
+3. Connect a wallet and click Review batch. The list is sent through this site's `/arc-rpc` proxy (or straight to Arc's public RPC if the proxy fails) for the gas estimate. Before you can confirm, the app checks that you are on Arc mainnet, that the contract address holds the expected contract code, and that your balance covers the total plus gas.
 4. Your wallet signs one `pay(recipients, amounts)` call with the exact total.
 5. The app only reports success after the receipt contains a matching `Paid` event for every recipient. The `?tx=0x...` link rebuilds the receipt from Arc RPC, so anyone who opens it sees the onchain data rather than something stored by the app.
 
@@ -48,7 +48,7 @@ The tests cover every line of the contract and include recipients that reject pa
 
 ## Running it locally
 
-You need Node.js 22.12 or newer.
+You need Node.js 22.12+ or 24+.
 
 ```bash
 npm ci
