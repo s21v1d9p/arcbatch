@@ -361,7 +361,6 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
       <p role="status" className="lab-status">{status}</p>
 
       <section className="lab-card">
-        <div className="lab-number">Step 1</div>
         <h2>{mainnet ? 'Deployment wallet' : 'Test wallet'}</h2>
         <p>{mainnet ? 'Use your funded MetaMask account on Arc Mainnet. No private-key export.' : 'Use a dedicated, faucet-funded MetaMask account. No private-key export.'}</p>
         {account && <p className="lab-data">Account <code>{account}</code></p>}
@@ -369,7 +368,6 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
       </section>
 
       <section className="lab-card">
-        <div className="lab-number">Step 2</div>
         <h2>Compiled ArcBatch contract</h2>
         <p>Only compiled code from this localhost project can be deployed. Check the wallet popup says <strong>{config.label}</strong>.</p>
         {artifact && <p className="lab-data">Creation bytecode hash <code>{keccak256(artifact.bytecode)}</code></p>}
@@ -409,14 +407,12 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
 
       {mainnet ? (
         <section className="lab-card">
-          <div className="lab-number">Step 3</div>
           <h2>First real payout</h2>
           <p>Use the Arc Payrun app, not this lab. Put the verified address in <code>.env.local</code>, restart <code>npm run dev</code>, then send a small payout from the main page.</p>
           {contract && <p className="lab-data"><code>VITE_ARC_BATCH_ADDRESS={contract}</code></p>}
         </section>
       ) : (
         <section className="lab-card">
-          <div className="lab-number">Step 3</div>
           <h2>Two-recipient smoke test</h2>
           <p>This sends 0.001 <strong>testnet</strong> USDC back to your connected account and 0.001 to a second account you control. Paste your second account address; no real USDC is used.</p>
           <label htmlFor="recipient">Second test wallet address</label>

@@ -127,8 +127,7 @@
 .explainer .section-intro { margin-bottom: 52px; }
 .explainer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 50px; }
 .explainer-grid > div { border-top: 1px solid #b5c7b8; padding-top: 21px; }
-.explainer-num { font: 12px var(--mono); color: var(--green); }
-.explainer-grid h3 { margin: 34px 0 8px; font: 500 28px var(--serif); letter-spacing: -.04em; }
+.explainer-grid h3 { margin: 4px 0 8px; font: 500 28px var(--serif); letter-spacing: -.04em; }
 .explainer-grid p { max-width: 330px; font-size: 13px; color: #58705e; line-height: 1.6; }
 .site-footer { padding: 34px 5.2%; display: flex; align-items: center; gap: 40px; }
 .footer-brand { font-size: 22px; letter-spacing: -1.4px; white-space: nowrap; }
@@ -192,7 +191,6 @@
   .add-row { padding-left: 23px; }
   .explainer { padding: 68px 5% 80px; }
   .explainer-grid { grid-template-columns: 1fr; gap: 29px; }
-  .explainer-grid h3 { margin-top: 18px; }
   .site-footer { flex-wrap: wrap; gap: 12px; padding: 30px 5%; }
   .site-footer > span { order: 3; flex-basis: 100%; }
 }

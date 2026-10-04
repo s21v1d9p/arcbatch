@@ -14,11 +14,10 @@ button:hover:not(:disabled) { background: #edffcf; }
 .lab-banner.mainnet { background: #ffb7a6; color: #4a130b; }
 .lab header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 34px 0 60px; }
 .lab header a { color: #e7f3e7; font-size: 24px; letter-spacing: -.07em; text-decoration: none; }
-.lab header span, .lab-number, .lab-data { font: 11px 'DM Mono', monospace; color: #a5c9ae; }
+.lab header span, .lab-data { font: 11px 'DM Mono', monospace; color: #a5c9ae; }
 .lab h1 { font-size: clamp(44px, 7vw, 78px); margin: 0 0 15px; line-height: 1; letter-spacing: -.07em; }
 .lab-intro { max-width: 650px; line-height: 1.6; color: #a6c2ac; margin-bottom: 35px; }
 .lab-card { border: 1px solid #456757; border-radius: 10px; margin: 18px 0; padding: 32px; background: #1b332a; }
-.lab-number { letter-spacing: .08em; color: #c9ed8f; }
 .lab-card h2 { font-size: 31px; margin: 12px 0 8px; letter-spacing: -.05em; }
 .lab-card p { color: #b7ceb9; line-height: 1.5; font-size: 14px; }
 .lab-data { overflow-wrap: anywhere; }

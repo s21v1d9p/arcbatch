@@ -20,14 +20,14 @@ On Arc, USDC is also the gas token, so the person paying only needs USDC in thei
 | Arc mainnet (5042) | [0xbC34...5A20](https://explorer.arc.io/address/0xbC34A2aF65dF1a21316Eb23dC6023139906d5A20) | [0x942a...a52f](https://explorer.arc.io/tx/0x942ae0e4b4c1b52fec68578a65c3734e53731232751c77a1484031041e18a52f) | [0xc6a7...cb06](https://explorer.arc.io/tx/0xc6a721b4541aad27bc28c6df4a34e916e7d58aa3b510f3e9373d8748ca9acb06) |
 | Arc testnet (5042002) | [0xbC34...5A20](https://explorer.testnet.arc.io/address/0xbC34A2aF65dF1a21316Eb23dC6023139906d5A20) | [0x8d00...9789](https://explorer.testnet.arc.io/tx/0x8d0002e20840d28ed86c56e1d748394cde3c071e7c8ffef996f45c9917f99789) | [0x29d3...9c29](https://explorer.testnet.arc.io/tx/0x29d3703ef6f18f4a6fb6c5733ba51c826f8208872362e1520db12e1346999c29) |
 
-Both contracts were deployed from the same account at nonce 0, which is why the address is the same on both networks. The mainnet runtime bytecode is identical to the testnet build, and the app checks this before it uses the contract.
+Both contracts were deployed from the same account at nonce 0, which is why the address is the same on both networks. The source is verified on both Arc explorers. The mainnet runtime bytecode is identical to the testnet build, and the app checks this before it uses the contract.
 
 The first mainnet payout went through the live app and sent 0.01 USDC to two addresses. Both balances went up by exactly 0.01 USDC and the contract kept nothing. Gas was about 0.002 USDC, and deploying the contract cost about 0.006 USDC.
 
 ## How it works
 
 1. Add recipients by hand or paste a CSV with `address,amount` lines. A header row is optional.
-2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. The app doesn't store the list. When you click Review batch, it is sent to Arc RPC for the gas estimate.
+2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. The app doesn't store the list. When you click Review batch, it is sent through this site's `/arc-rpc` proxy to Arc's public RPC for the gas estimate.
 3. Connect a wallet. Before you can confirm, the app checks that you are on Arc mainnet, that the contract address holds the expected contract code, and that your balance covers the total plus gas.
 4. Your wallet signs one `pay(recipients, amounts)` call with the exact total.
 5. The app only reports success after the receipt contains a matching `Paid` event for every recipient. The `?tx=0x...` link rebuilds the receipt from Arc RPC, so anyone who opens it sees the onchain data rather than something stored by the app.
@@ -48,7 +48,7 @@ The tests cover every line of the contract and include recipients that reject pa
 
 ## Running it locally
 
-You need Node.js 22 or newer.
+You need Node.js 22.12 or newer.
 
 ```bash
 npm ci
@@ -56,7 +56,7 @@ npm run check
 npm run dev
 ```
 
-`npm run check` compiles the contract, then runs the frontend tests, the Hardhat contract tests, the linter, the TypeScript build and the production build.
+`npm run check` compiles the contract, then runs the frontend tests, the Hardhat contract tests, the linter, the TypeScript build and the production build. `npx hardhat test nodejs --coverage` prints the contract coverage.
 
 Payments stay disabled until `VITE_ARC_BATCH_ADDRESS` is set. To point a local build at the mainnet contract:
 

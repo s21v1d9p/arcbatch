@@ -181,7 +181,8 @@ describe('Arc Payrun interface', () => {
   it('states plainly where recipient data goes', () => {
     render(<App />)
     expect(screen.getByRole('link', { name: /arc payrun home/i })).toBeTruthy()
-    expect(screen.getByText(/sent to Arc RPC for the gas estimate/i)).toBeTruthy()
+    expect(screen.getByText(/sent through this site's RPC proxy to Arc for the gas estimate/i)).toBeTruthy()
+    expect(screen.getByText(/pays each recipient in the same transaction/i)).toBeTruthy()
     expect(screen.queryByText(/never leaves your browser|nothing is uploaded|without trusting/i)).toBeNull()
   })
 })

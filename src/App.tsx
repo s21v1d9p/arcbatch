@@ -380,7 +380,7 @@ function App() {
                     {stage === 'reviewing' ? 'Checking Arc...' : 'Review batch'} <span aria-hidden="true">-&gt;</span>
                   </button>
                 )}
-                <p>Funds move directly from your wallet. If any payment fails, the entire batch reverts.</p>
+                <p>Your wallet sends the total to the payout contract, which pays each recipient in the same transaction. If any payment fails, the whole batch reverts.</p>
               </div>
               {contractState.error && <p className="configuration-message">{contractState.error}. Deploy and set VITE_ARC_BATCH_ADDRESS to enable payments.</p>}
             </aside>
@@ -429,9 +429,9 @@ function App() {
             <h2>How it works</h2>
           </div>
           <div className="explainer-grid">
-            <div><span className="explainer-num">1</span><h3>Add recipients</h3><p>Type them in or paste a CSV. The app doesn't store your list. It is sent to Arc RPC for the gas estimate, and addresses and amounts become public once the payout is sent.</p></div>
-            <div><span className="explainer-num">2</span><h3>Approve one transaction</h3><p>You see the total and the gas estimate before your wallet asks you to sign. If any transfer fails, the whole batch is reverted.</p></div>
-            <div><span className="explainer-num">3</span><h3>Share the receipt</h3><p>The receipt link reads the payment events from Arc RPC and links to Arc Explorer, so anyone can check the payout there.</p></div>
+            <div><h3>Add recipients</h3><p>Type them in or paste a CSV. The app doesn't store your list. It is sent through this site's RPC proxy to Arc for the gas estimate, and addresses and amounts become public once the payout is sent.</p></div>
+            <div><h3>Approve one transaction</h3><p>You see the total and the gas estimate before your wallet asks you to sign. If any transfer fails, the whole batch is reverted.</p></div>
+            <div><h3>Share the receipt</h3><p>The receipt link reads the payment events from Arc RPC and links to Arc Explorer, so anyone can check the payout there.</p></div>
           </div>
         </section>
       </main>
