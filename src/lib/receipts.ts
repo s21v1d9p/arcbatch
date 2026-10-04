@@ -34,7 +34,7 @@ export function parsePaidReceipt(
     const event = decodeEventLog({ abi: batchAbi, topics: log.topics, data: log.data })
     if (event.args.sender.toLowerCase() !== sender.toLowerCase()) continue
     if (event.args.amount <= 0n || event.args.index !== BigInt(payments.length)) {
-      throw new Error('ArcBatch receipt contains inconsistent payment events')
+      throw new Error('Receipt contains inconsistent payment events')
     }
     payments.push({
       recipient: getAddress(event.args.recipient),
@@ -42,6 +42,6 @@ export function parsePaidReceipt(
       index: payments.length,
     })
   }
-  if (payments.length === 0) throw new Error('No ArcBatch payments found in this transaction')
+  if (payments.length === 0) throw new Error('No payout events found in this transaction')
   return payments
 }

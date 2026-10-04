@@ -1,13 +1,13 @@
-# ArcBatch
+# Arc Payrun
 
-[![CI](https://github.com/s21v1d9p/arcbatch/actions/workflows/ci.yml/badge.svg)](https://github.com/s21v1d9p/arcbatch/actions/workflows/ci.yml)
+[![CI](https://github.com/s21v1d9p/arcpayrun/actions/workflows/ci.yml/badge.svg)](https://github.com/s21v1d9p/arcpayrun/actions/workflows/ci.yml)
 
-ArcBatch is a small web app for paying several people in USDC at once on Arc. You paste a list of addresses and amounts, approve one transaction in your wallet, and get a receipt link that anyone can check against the chain.
+Arc Payrun is a small web app for paying several people in USDC at once on Arc. You paste a list of addresses and amounts, approve one transaction in your wallet, and get a receipt link that anyone can check against the chain.
 
 I built it for grant programs, DAOs and small teams that pay contributors in batches and need a simple record of who was paid what.
 
-- Live app: https://arcbatch-zeta.vercel.app
-- Receipt for the first mainnet payout: https://arcbatch-zeta.vercel.app/?tx=0xc6a721b4541aad27bc28c6df4a34e916e7d58aa3b510f3e9373d8748ca9acb06
+- Live app: https://arcpayrun.vercel.app
+- Receipt for the first mainnet payout: https://arcpayrun.vercel.app/?tx=0xc6a721b4541aad27bc28c6df4a34e916e7d58aa3b510f3e9373d8748ca9acb06
 
 ## Why Arc
 
@@ -27,8 +27,8 @@ The first mainnet payout went through the live app and sent 0.01 USDC to two add
 ## How it works
 
 1. Add recipients by hand or paste a CSV with `address,amount` lines. A header row is optional.
-2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. The list never leaves your browser.
-3. Connect a wallet. Before you can confirm, the app checks that you are on Arc mainnet, that the contract address holds the expected ArcBatch code, and that your balance covers the total plus gas.
+2. The app checks every address, rejects duplicates, allows at most 6 decimal places and caps the list at 25 recipients. The app doesn't store the list. When you click Review batch, it is sent to Arc RPC for the gas estimate.
+3. Connect a wallet. Before you can confirm, the app checks that you are on Arc mainnet, that the contract address holds the expected contract code, and that your balance covers the total plus gas.
 4. Your wallet signs one `pay(recipients, amounts)` call with the exact total.
 5. The app only reports success after the receipt contains a matching `Paid` event for every recipient. The `?tx=0x...` link rebuilds the receipt from Arc RPC, so anyone who opens it sees the onchain data rather than something stored by the app.
 
@@ -36,7 +36,7 @@ Recipient addresses and amounts are public once the transaction is sent.
 
 ## Security notes
 
-- The contract (`contracts/ArcBatch.sol`) has no owner, no upgrade path and no withdraw function, and it doesn't hold funds after a call.
+- The payout contract (`contracts/ArcBatch.sol`) has no owner, no upgrade path and no withdraw function, and it doesn't hold funds after a call.
 - `msg.value` has to equal the sum of the amounts. If one transfer fails, every transfer in the batch is reverted.
 - The app pins the runtime bytecode in `src/lib/contractCode.ts` and refuses to send payouts to, or show receipts from, an address with different code.
 - The wallet has to be on chain 5042. Nothing is marked as paid if the account changes, the quote is stale, the signature is rejected, or the transaction is still pending or reverted. Once a transaction is submitted, the confirm button stays disabled so the same list can't be sent twice.

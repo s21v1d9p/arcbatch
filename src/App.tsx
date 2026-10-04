@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { formatUnits } from 'viem'
 import type { Address, Hash } from 'viem'
@@ -51,6 +51,9 @@ function App() {
   const [hash, setHash] = useState<Hash | null>(linkedHash)
   const [payment, setPayment] = useState<PaymentResult | null>(null)
   const [failed, setFailed] = useState(false)
+  const resultRef = useRef<HTMLElement>(null)
+  // Shared receipt links open far above the result, so bring it into view once it settles.
+  const scrollLinkResult = useRef(Boolean(initialTx))
   const [submittedBatch, setSubmittedBatch] = useState<Batch | null>(null)
 
   const contractState = useMemo(() => {
@@ -95,6 +98,12 @@ function App() {
       active = false
     }
   }, [linkedHash])
+
+  useEffect(() => {
+    if (!payment && !(scrollLinkResult.current && (error || failed))) return
+    scrollLinkResult.current = false
+    resultRef.current?.scrollIntoView?.({ block: 'start' })
+  }, [payment, error, failed])
 
   const busy = stage !== 'idle'
   const reviewed = !hash && quote && quoteFor === draftKey && calculation.batch
@@ -225,9 +234,9 @@ function App() {
   return (
     <div className="site-shell">
       <header className="site-header">
-        <a className="brand" href="/" aria-label="ArcBatch home">
+        <a className="brand" href="/" aria-label="Arc Payrun home">
           <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
-          <span>arc<span className="brand-weight">batch</span><span className="brand-dot">.</span></span>
+          <span>arc<span className="brand-weight">payrun</span><span className="brand-dot">.</span></span>
         </a>
         <nav className="header-nav" aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
@@ -242,14 +251,13 @@ function App() {
       <main>
         <section className="hero-panel" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <div className="eyebrow"><span className="eyebrow-line" /> Live on Arc mainnet <span className="network-id">chain 5042</span></div>
+            <div className="eyebrow">Runs on Arc mainnet (chain 5042)</div>
             <h1 id="hero-title">Batch payouts{' '}<br /><em>in USDC</em></h1>
             <p>Send USDC to up to 25 wallets in one Arc transaction. Once it confirms, you get a receipt link that anyone can check against the chain.</p>
             <a href="#workspace" className="hero-link">Start a payout <span aria-hidden="true">-&gt;</span></a>
           </div>
           <div className="hero-graphic" aria-hidden="true">
-            <div className="graphic-caption"><span>Your wallet</span><span>Recipients</span></div>
-            <div className="graphic-node graphic-node-source">01</div>
+            <div className="graphic-node graphic-node-source">You</div>
             <div className="graphic-path path-top" />
             <div className="graphic-path path-middle" />
             <div className="graphic-path path-bottom" />
@@ -257,12 +265,6 @@ function App() {
             <div className="graphic-node graphic-node-two">B</div>
             <div className="graphic-node graphic-node-three">C</div>
           </div>
-        </section>
-
-        <section className="trust-strip" aria-label="Key features">
-          <span>One signature for the whole list</span>
-          <span>If one transfer fails, nobody is paid</span>
-          <span>Receipt link anyone can check</span>
         </section>
 
         <section id="workspace" className="workspace" aria-labelledby="workspace-heading">
@@ -275,7 +277,6 @@ function App() {
             <div className="editor-card">
               <div className="card-topline">
                 <h3>Recipients</h3>
-                <span className="card-step">Step 1 of 2</span>
               </div>
               <div className="mode-tabs" role="group" aria-label="Input method">
                 <button type="button" className={mode === 'manual' ? 'active' : ''} onClick={() => { setMode('manual'); setQuote(null) }} disabled={busy}>Add manually</button>
@@ -286,7 +287,7 @@ function App() {
                   <div className="input-heading"><span>Wallet address</span><span>Amount (USDC)</span></div>
                   {rows.map((row, index) => (
                     <div className="recipient-row" key={index}>
-                      <span className="row-number">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="row-number">{index + 1}</span>
                       <input
                         aria-label={`Recipient address ${index + 1}`}
                         placeholder="0x..."
@@ -346,7 +347,6 @@ function App() {
             <aside className="review-card" aria-label="Payout summary">
               <div className="card-topline">
                 <h3>Summary</h3>
-                <span className="card-step">Step 2 of 2</span>
               </div>
               <div className="summary-count">
                 <span>Batch size</span>
@@ -355,7 +355,7 @@ function App() {
               <div className="ledger-lines">
                 {calculation.batch ? calculation.batch.payouts.map((payout, index) => (
                   <div className="ledger-line" key={payout.address}>
-                    <span><i>{String(index + 1).padStart(2, '0')}</i> {shortAddress(payout.address)}</span>
+                    <span><i>{index + 1}.</i> {shortAddress(payout.address)}</span>
                     <b>{payout.amount}</b>
                   </div>
                 )) : <p className="empty-ledger">Your payout preview will appear here when recipients are valid.</p>}
@@ -388,7 +388,7 @@ function App() {
         </section>
 
         {(error || hash || payment) && (
-          <section className="result-area" aria-live="polite">
+          <section className="result-area" aria-live="polite" ref={resultRef}>
             {error && <div className="error-banner" role="alert">{error}</div>}
             {hash && !payment && (
               <div className="pending-card">
@@ -409,7 +409,7 @@ function App() {
                 <div className="receipt-list">
                   {payment.payments.map((item) => (
                     <div key={item.index}>
-                      <span>{String(item.index + 1).padStart(2, '0')} / {shortAddress(item.recipient)}</span>
+                      <span>{item.index + 1}. {shortAddress(item.recipient)}</span>
                       <strong>{usdc(item.amount)} USDC</strong>
                     </div>
                   ))}
@@ -429,17 +429,17 @@ function App() {
             <h2>How it works</h2>
           </div>
           <div className="explainer-grid">
-            <div><span className="explainer-num">1</span><h3>Add recipients</h3><p>Type them in or paste a CSV. Nothing is uploaded, but addresses and amounts become public once the payout is sent.</p></div>
+            <div><span className="explainer-num">1</span><h3>Add recipients</h3><p>Type them in or paste a CSV. The app doesn't store your list. It is sent to Arc RPC for the gas estimate, and addresses and amounts become public once the payout is sent.</p></div>
             <div><span className="explainer-num">2</span><h3>Approve one transaction</h3><p>You see the total and the gas estimate before your wallet asks you to sign. If any transfer fails, the whole batch is reverted.</p></div>
-            <div><span className="explainer-num">3</span><h3>Share the receipt</h3><p>The receipt link reads the payment events directly from Arc, so whoever opens it can check the payout without trusting this site.</p></div>
+            <div><span className="explainer-num">3</span><h3>Share the receipt</h3><p>The receipt link reads the payment events from Arc RPC and links to Arc Explorer, so anyone can check the payout there.</p></div>
           </div>
         </section>
       </main>
       <footer className="site-footer">
-        <div className="footer-brand">arc<span>batch</span>.</div>
+        <div className="footer-brand">arc<span>payrun</span>.</div>
         <span>Batch USDC payouts on Arc mainnet</span>
         <nav className="footer-links" aria-label="Footer">
-          <a href="https://github.com/s21v1d9p/arcbatch" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/s21v1d9p/arcpayrun" target="_blank" rel="noreferrer">GitHub</a>
           <a href="https://explorer.arc.io" target="_blank" rel="noreferrer">Arc Explorer</a>
         </nav>
       </footer>

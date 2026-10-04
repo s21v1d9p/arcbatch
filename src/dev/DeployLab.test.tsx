@@ -76,7 +76,7 @@ describe('local-only mainnet deployment mode', () => {
     render(<DeployLab network="mainnet" />)
 
     expect(screen.getByRole('heading', { name: /arc mainnet deploy/i })).toBeTruthy()
-    expect(document.querySelector('.lab-banner')?.textContent).toMatch(/ARC MAINNET.*REAL USDC/)
+    expect(document.querySelector('.lab-banner')?.textContent).toMatch(/Arc Mainnet, real USDC/)
     expect(screen.queryByRole('heading', { name: /two-recipient smoke test/i })).toBeNull()
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toMatch(/matches verified ArcBatch bytecode/i),

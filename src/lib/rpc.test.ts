@@ -3,7 +3,7 @@ import { createPublicClient } from 'viem'
 import { arcMainnet } from './networks'
 import { ARC_MAINNET_RPC, arcMainnetTransport } from './rpc'
 
-const origin = 'https://arcbatch.example'
+const origin = 'https://arcpayrun.example'
 const proxyUrl = `${origin}/arc-rpc`
 const directUrl = new URL(ARC_MAINNET_RPC).toString()
 

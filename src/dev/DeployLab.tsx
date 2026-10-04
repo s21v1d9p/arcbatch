@@ -347,9 +347,9 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
   return (
     <main className="lab">
       <div className={mainnet ? 'lab-banner mainnet' : 'lab-banner'}>
-        LOCALHOST ONLY <span>/</span> {config.label.toUpperCase()} <span>/</span> {mainnet ? 'REAL USDC' : 'NO REAL FUNDS'}
+        Local only: {config.label}, {mainnet ? 'real USDC' : 'test funds only'}
       </div>
-      <header><a href="/">arc<strong>batch</strong>.</a><span>Local deploy helper, chain {config.chain.id}</span></header>
+      <header><a href="/">arc<strong>payrun</strong>.</a><span>Local deploy helper, chain {config.chain.id}</span></header>
       <h1>{mainnet ? 'Arc Mainnet deploy' : 'Arc Testnet lab'}</h1>
       <p className="lab-intro">
         {mainnet
@@ -370,7 +370,7 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
 
       <section className="lab-card">
         <div className="lab-number">Step 2</div>
-        <h2>Compiled ArcBatch</h2>
+        <h2>Compiled ArcBatch contract</h2>
         <p>Only compiled code from this localhost project can be deployed. Check the wallet popup says <strong>{config.label}</strong>.</p>
         {artifact && <p className="lab-data">Creation bytecode hash <code>{keccak256(artifact.bytecode)}</code></p>}
         {mainnet && (
@@ -411,14 +411,14 @@ function DeployLab({ network = 'testnet' }: { network?: LabNetwork }) {
         <section className="lab-card">
           <div className="lab-number">Step 3</div>
           <h2>First real payout</h2>
-          <p>Use the ArcBatch app, not this lab. Put the verified address in <code>.env.local</code>, restart <code>npm run dev</code>, then send a small payout from the main page.</p>
+          <p>Use the Arc Payrun app, not this lab. Put the verified address in <code>.env.local</code>, restart <code>npm run dev</code>, then send a small payout from the main page.</p>
           {contract && <p className="lab-data"><code>VITE_ARC_BATCH_ADDRESS={contract}</code></p>}
         </section>
       ) : (
         <section className="lab-card">
           <div className="lab-number">Step 3</div>
           <h2>Two-recipient smoke test</h2>
-          <p>We will send 0.001 <strong>testnet</strong> USDC back to your connected account and 0.001 to a second account you control. Paste your second account address; no real USDC is used.</p>
+          <p>This sends 0.001 <strong>testnet</strong> USDC back to your connected account and 0.001 to a second account you control. Paste your second account address; no real USDC is used.</p>
           <label htmlFor="recipient">Second test wallet address</label>
           <input id="recipient" value={secondRecipient} onChange={(event) => { setSecondRecipient(event.target.value); setPayoutQuote(null) }} placeholder="0x..." disabled={busy || !!payoutHash} />
           <button onClick={estimatePayout} disabled={!contract || !account || !secondRecipient || !!payoutHash || busy}>Review tiny payout</button>

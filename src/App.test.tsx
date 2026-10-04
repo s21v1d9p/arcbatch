@@ -15,7 +15,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-describe('ArcBatch interface', () => {
+describe('Arc Payrun interface', () => {
   it('shows exact CSV payout preview while keeping signing unavailable without deployment', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -158,6 +158,8 @@ describe('ArcBatch interface', () => {
 
   it('shows a confirmed receipt from a share link with correct singular wording', async () => {
     const hash = `0x${'d'.repeat(64)}` as const
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
     window.history.replaceState(null, '', `/?tx=${hash}`)
     vi.spyOn(chain, 'loadPayment').mockResolvedValue({
       hash,
@@ -170,6 +172,16 @@ describe('ArcBatch interface', () => {
     expect(await screen.findByRole('heading', { name: /all payments confirmed/i })).toBeTruthy()
     expect(screen.getByText(/confirmed on arc mainnet, block 42/i)).toBeTruthy()
     expect(screen.getByText(/paid 1 recipient in one transaction/i)).toBeTruthy()
+    expect(screen.getByText('1. 0x2222...2222')).toBeTruthy()
     expect(screen.getByText('0.01 USDC')).toBeTruthy()
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
+  it('states plainly where recipient data goes', () => {
+    render(<App />)
+    expect(screen.getByRole('link', { name: /arc payrun home/i })).toBeTruthy()
+    expect(screen.getByText(/sent to Arc RPC for the gas estimate/i)).toBeTruthy()
+    expect(screen.queryByText(/never leaves your browser|nothing is uploaded|without trusting/i)).toBeNull()
   })
 })

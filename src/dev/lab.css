@@ -12,8 +12,6 @@ button:hover:not(:disabled) { background: #edffcf; }
 .lab { max-width: 920px; margin: auto; padding: 24px 24px 90px; }
 .lab-banner { padding: 12px 20px; background: #d8f6aa; color: #19352b; font: 11px 'DM Mono', monospace; letter-spacing: .12em; text-align: center; border-radius: 5px; }
 .lab-banner.mainnet { background: #ffb7a6; color: #4a130b; }
-.lab-banner.mainnet span { color: #8a3c2e; }
-.lab-banner span { margin: 0 8px; color: #5e8675; }
 .lab header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 34px 0 60px; }
 .lab header a { color: #e7f3e7; font-size: 24px; letter-spacing: -.07em; text-decoration: none; }
 .lab header span, .lab-number, .lab-data { font: 11px 'DM Mono', monospace; color: #a5c9ae; }

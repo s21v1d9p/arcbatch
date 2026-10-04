@@ -112,7 +112,7 @@ describe('mainnet payout quote', () => {
     const code = vi.spyOn(publicClient, 'getCode').mockResolvedValue(undefined)
     await expect(preparePayment(batch, sender)).rejects.toThrow('not deployed')
     code.mockResolvedValue('0x6000')
-    await expect(preparePayment(batch, sender)).rejects.toThrow('verified ArcBatch bytecode')
+    await expect(preparePayment(batch, sender)).rejects.toThrow('verified payout contract bytecode')
     code.mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
     vi.spyOn(publicClient, 'estimateContractGas').mockResolvedValue(100_000n)
     vi.spyOn(publicClient, 'estimateFeesPerGas').mockResolvedValue({
@@ -175,7 +175,7 @@ describe('mainnet payout quote', () => {
 })
 
 describe('shared receipt verification', () => {
-  it('refuses receipts from a configured address that is not verified ArcBatch code', async () => {
+  it('refuses receipts from a configured address that is not the verified payout contract', async () => {
     vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
     const hash = `0x${'e'.repeat(64)}` as const
     vi.spyOn(publicClient, 'getTransaction').mockResolvedValue({ to: contract, from: sender } as never)
@@ -184,10 +184,10 @@ describe('shared receipt verification', () => {
       .spyOn(publicClient, 'getTransactionReceipt')
       .mockResolvedValue({ status: 'success', logs: [], blockNumber: 1n } as never)
 
-    await expect(loadPayment(hash)).rejects.toThrow('verified ArcBatch bytecode')
+    await expect(loadPayment(hash)).rejects.toThrow('verified payout contract bytecode')
     expect(receipt).not.toHaveBeenCalled()
     code.mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
-    await expect(loadPayment(hash)).rejects.toThrow('No ArcBatch payments')
+    await expect(loadPayment(hash)).rejects.toThrow('No payout events')
   })
 
   it('returns a checksummed sender for shareable receipts', async () => {

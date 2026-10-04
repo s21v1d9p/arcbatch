@@ -57,11 +57,11 @@ export async function connectWallet(): Promise<Address> {
   return connectToChain(arcMainnet)
 }
 
-async function assertArcBatchContract(address: Address): Promise<void> {
+async function assertPayoutContract(address: Address): Promise<void> {
   const code = await publicClient.getCode({ address })
   if (!code || code === '0x') throw new Error('Configured contract is not deployed on Arc mainnet')
   if (code.toLowerCase() !== ARC_BATCH_RUNTIME_CODE.toLowerCase()) {
-    throw new Error('Configured contract does not match the verified ArcBatch bytecode')
+    throw new Error('Configured contract does not match the verified payout contract bytecode')
   }
 }
 
@@ -70,7 +70,7 @@ export async function preparePayment(batch: Batch, account: Address): Promise<Qu
   if ((await publicClient.getChainId()) !== arcMainnet.id) {
     throw new Error('RPC is not connected to Arc mainnet')
   }
-  await assertArcBatchContract(contract)
+  await assertPayoutContract(contract)
 
   const args = [
     batch.payouts.map((payout) => payout.address),
@@ -140,9 +140,9 @@ export async function loadPayment(hash: Hash) {
   const contract = configuredContract()
   const transaction = await publicClient.getTransaction({ hash })
   if (transaction.to?.toLowerCase() !== contract.toLowerCase()) {
-    throw new Error('Transaction was not sent to the configured ArcBatch contract')
+    throw new Error('Transaction was not sent to the configured payout contract')
   }
-  await assertArcBatchContract(contract)
+  await assertPayoutContract(contract)
   const receipt = await publicClient.getTransactionReceipt({ hash })
   const payments = parsePaidReceipt(receipt, contract, transaction.from)
   return { hash, sender: getAddress(transaction.from), payments, blockNumber: receipt.blockNumber }

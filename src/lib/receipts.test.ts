@@ -47,10 +47,10 @@ describe('parsePaidReceipt', () => {
       RevertedPaymentError,
     )
     expect(() => parsePaidReceipt({ status: 'success', logs: [] }, contract, sender)).toThrow(
-      'No ArcBatch payments',
+      'No payout events',
     )
     expect(() => parsePaidReceipt({ status: 'success', logs: [paidLog] }, sender, sender)).toThrow(
-      'No ArcBatch payments',
+      'No payout events',
     )
   })
 })
