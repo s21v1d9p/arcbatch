@@ -1,0 +1,39 @@
+{
+  "name": "arcbatch",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint src test scripts hardhat.config.ts",
+    "preview": "vite preview",
+    "pretest": "hardhat build",
+    "test": "vitest run",
+    "test:contract": "hardhat test nodejs",
+    "check": "npm run test && npm run test:contract && npm run lint && npm run build"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "viem": "^2.56.9"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-keystore": "^3.1.0",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.1.0",
+    "@nomicfoundation/hardhat-viem": "^3.0.9",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "hardhat": "^3.18.0",
+    "jsdom": "^27.0.0",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.2"
+  }
+}

@@ -1,0 +1,28 @@
+:root {
+  font-family: 'Space Grotesk', sans-serif;
+  color: #162b22;
+  background: #f6f6ef;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body { margin: 0; min-width: 320px; }
+
+button, input, textarea { font: inherit; }
+
+button { cursor: pointer; }
+
+a { color: inherit; }
+
+::selection { background: #cfee89; color: #173329; }
+
+:focus-visible { outline: 3px solid #298264; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
