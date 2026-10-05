@@ -34,6 +34,17 @@ The first mainnet payout went through the live app and sent 0.01 USDC to two add
 
 Recipient addresses and amounts are public once the transaction is sent.
 
+## Paying from a Safe
+
+Teams that hold USDC in a Safe on Arc can run Arc Payrun as a Safe App:
+
+1. Open the Safe in [Safe{Wallet}](https://app.safe.global) on Arc.
+2. Go to Apps, choose "My custom apps", and add `https://arcpayrun.vercel.app`.
+3. Open Arc Payrun from the Safe. It picks up the Safe address, so there is nothing to connect.
+4. Add recipients, review the batch, and click Propose in Safe. The Safe owners sign and execute it in Safe{Wallet} as usual.
+
+The Safe pays the total and the owner who executes the transaction pays the gas. Arc Payrun shows the receipt once the transaction runs, and the receipt link names the Safe as the payer. Safe{Wallet} stores the proposed transaction, including recipients and amounts, so the other owners can sign it. Arc Payrun remembers proposals that are still waiting, in this browser only, so the same payout is not proposed twice.
+
 ## Security notes
 
 - The payout contract (`contracts/ArcBatch.sol`) has no owner, no upgrade path and no withdraw function, and it doesn't hold funds after a call.
@@ -42,7 +53,8 @@ Recipient addresses and amounts are public once the transaction is sent.
 - The wallet has to be on chain 5042. Nothing is marked as paid if the account changes, the quote is stale, the signature is rejected, or the transaction is still pending or reverted. Once a transaction is submitted, the confirm button stays disabled so the same list can't be sent twice.
 - Fee caps account for Arc's 20 Gwei minimum base fee plus the priority fee.
 - EasyPrivacy blocks third-party requests to `arc.io` (`||arc.io^$third-party`), which breaks direct RPC calls for many people with ad blockers. The app sends RPC calls to a same-origin `/arc-rpc` proxy first and falls back to `https://rpc.mainnet.arc.io`.
-- `vercel.json` sets basic security headers and stops the site from being framed.
+- `vercel.json` sets basic security headers. Only the site itself and Safe{Wallet} (`app.safe.global`) can frame it, and `manifest.json` allows cross-origin reads so Safe{Wallet} can show the app's name and icon.
+- Inside Safe{Wallet}, the Safe Apps SDK only accepts messages from `https://app.safe.global`, and it is loaded only when the page runs in a frame.
 
 The tests cover every line of the contract and include recipients that reject payments, recipients that try to call back into the contract, a full 25-recipient batch, invalid input and receipts that don't match. The contract has not been audited. A recipient that rejects USDC, a blocklisted address or any transfer that Arc's value rules forbid will make the whole batch revert.
 

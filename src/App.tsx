@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { formatUnits } from 'viem'
+import { formatUnits, getAddress, isAddress } from 'viem'
 import type { Address, Hash } from 'viem'
 import {
-  assertMatchesReviewedBatch,
+  arcMainnet,
   configuredContract,
   connectWallet,
   explorerTransaction,
   loadPayment,
+  matchingRun,
   preparePayment,
+  prepareSafePayment,
   sendPayment,
 } from './lib/chain'
-import type { Quote } from './lib/chain'
+import type { Quote, SafeQuote } from './lib/chain'
 import { parseCsvRows, validatePayouts } from './lib/payouts'
 import type { Batch, PayoutInput } from './lib/payouts'
 import { RevertedPaymentError } from './lib/receipts'
+import {
+  completeSafePayment,
+  detectSafe,
+  forgetPendingPayout,
+  duplicateStatus,
+  proposeSafePayment,
+  refreshPendingPayouts,
+  rememberPendingPayout,
+  restoreBatch,
+  SafeCancelledError,
+  SafePendingError,
+} from './lib/safe'
+import type { SafeProgress, SafeSession } from './lib/safe'
 import './App.css'
 
 type PaymentResult = Awaited<ReturnType<typeof loadPayment>>
@@ -38,23 +53,34 @@ function recipientCount(count: number): string {
 }
 
 function App() {
-  const initialTx = useMemo(() => new URLSearchParams(window.location.search).get('tx'), [])
-  const linkedHash = initialTx && /^0x[0-9a-fA-F]{64}$/.test(initialTx) ? initialTx as Hash : null
+  const params = useMemo(() => new URLSearchParams(window.location.search), [])
+  const initialTx = params.get('tx')
+  const initialPayer = params.get('payer')
+  const payerValid = !initialPayer || isAddress(initialPayer)
+  const linkedHash = initialTx && /^0x[0-9a-fA-F]{64}$/.test(initialTx) && payerValid ? initialTx as Hash : null
+  const linkedPayer = initialPayer && isAddress(initialPayer) ? getAddress(initialPayer) : undefined
   const [mode, setMode] = useState<Mode>('manual')
   const [rows, setRows] = useState<PayoutInput[]>([{ address: '', amount: '' }])
   const [csv, setCsv] = useState('')
   const [account, setAccount] = useState<Address | null>(null)
-  const [quote, setQuote] = useState<Quote | null>(null)
+  const [quote, setQuote] = useState<Quote | SafeQuote | null>(null)
   const [quoteFor, setQuoteFor] = useState('')
   const [stage, setStage] = useState<Stage>(linkedHash ? 'loading' : 'idle')
-  const [error, setError] = useState(initialTx && !linkedHash ? 'Invalid transaction hash in share link' : '')
+  const [error, setError] = useState(
+    !payerValid ? 'Invalid payer address in share link' : initialTx && !linkedHash ? 'Invalid transaction hash in share link' : '',
+  )
   const [hash, setHash] = useState<Hash | null>(linkedHash)
   const [payment, setPayment] = useState<PaymentResult | null>(null)
   const [failed, setFailed] = useState(false)
   const resultRef = useRef<HTMLElement>(null)
   // Shared receipt links open far above the result, so bring it into view once it settles.
   const scrollLinkResult = useRef(Boolean(initialTx))
+  const proposing = useRef(false)
   const [submittedBatch, setSubmittedBatch] = useState<Batch | null>(null)
+  const [safe, setSafe] = useState<SafeSession | null>(null)
+  const [safeIssue, setSafeIssue] = useState('')
+  const [safeTxHash, setSafeTxHash] = useState<string | null>(null)
+  const [safeProgress, setSafeProgress] = useState<SafeProgress | null>(null)
 
   const contractState = useMemo(() => {
     try {
@@ -80,7 +106,7 @@ function App() {
   useEffect(() => {
     if (!linkedHash) return
     let active = true
-    loadPayment(linkedHash)
+    loadPayment(linkedHash, linkedPayer)
       .then((result) => {
         if (active) {
           setPayment(result)
@@ -97,7 +123,31 @@ function App() {
     return () => {
       active = false
     }
-  }, [linkedHash])
+  }, [linkedHash, linkedPayer])
+
+  useEffect(() => {
+    let active = true
+    // Outside Safe{Wallet}, or if it never answers, the normal wallet flow stays in place.
+    detectSafe()
+      .then(async (session) => {
+        if (!active || !session) return
+        if (session.chainId !== arcMainnet.id) {
+          setSafeIssue('This Safe is not on Arc mainnet. Open a Safe on Arc (chain 5042) to pay from it.')
+          return
+        }
+        setSafe(session)
+        setAccount(session.address)
+        const waiting = (await refreshPendingPayouts(session)).at(-1)
+        if (active && waiting) {
+          setSafeTxHash(waiting.safeTxHash)
+          setSubmittedBatch(restoreBatch(waiting))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!payment && !(scrollLinkResult.current && (error || failed))) return
@@ -106,7 +156,7 @@ function App() {
   }, [payment, error, failed])
 
   const busy = stage !== 'idle'
-  const reviewed = !hash && quote && quoteFor === draftKey && calculation.batch
+  const reviewed = !hash && !safeTxHash && quote && quoteFor === draftKey && calculation.batch
 
   function newBatch() {
     if (!payment && !failed) return
@@ -116,6 +166,8 @@ function App() {
     setFailed(false)
     setQuote(null)
     setSubmittedBatch(null)
+    setSafeTxHash(null)
+    setSafeProgress(null)
     setRows([{ address: '', amount: '' }])
     setCsv('')
     setMode('manual')
@@ -164,7 +216,9 @@ function App() {
     setStage('reviewing')
     setError('')
     try {
-      const nextQuote = await preparePayment(calculation.batch, account)
+      const nextQuote = safe
+        ? await prepareSafePayment(calculation.batch, safe.address)
+        : await preparePayment(calculation.batch, account)
       setQuote(nextQuote)
       setQuoteFor(draftKey)
     } catch (cause) {
@@ -176,6 +230,8 @@ function App() {
 
   async function confirm() {
     if (!reviewed || !quote) return
+    if (safe) return proposeInSafe(safe, reviewed, quote)
+    if (!('maxNetworkFee' in quote)) return
     setStage('signing')
     setError('')
     let submittedHash: Hash | null = null
@@ -204,14 +260,93 @@ function App() {
     }
   }
 
+  async function proposeInSafe(session: SafeSession, batch: Batch, safeQuote: SafeQuote) {
+    if (proposing.current) return
+    proposing.current = true
+    setStage('signing')
+    setError('')
+    try {
+      const duplicate = await duplicateStatus(session, batch)
+      if (duplicate !== 'none') {
+        setError(
+          duplicate === 'pending'
+            ? 'This exact payout is already waiting in your Safe. Sign it in the Safe queue instead of proposing it again.'
+            : 'Could not confirm with Safe whether this exact payout is still waiting. Try again in a moment, or use Forget this proposal if you deleted it in Safe.',
+        )
+        setStage('idle')
+        return
+      }
+      let proposed: string
+      try {
+        proposed = await proposeSafePayment(session, batch, safeQuote)
+      } catch (cause) {
+        setError(`Payout not proposed: ${errorMessage(cause)}`)
+        setStage('idle')
+        return
+      }
+      rememberPendingPayout(session.address, proposed, batch)
+      setSafeTxHash(proposed)
+      setQuote(null)
+      setSubmittedBatch(batch)
+      await followSafePayment(session, proposed, batch, safeQuote.contract)
+    } finally {
+      proposing.current = false
+    }
+  }
+
+  function clearSafeProposal() {
+    setSafeTxHash(null)
+    setSafeProgress(null)
+    setSubmittedBatch(null)
+    setError('')
+  }
+
+  async function followSafePayment(session: SafeSession, proposed: string, batch: Batch, contract: Address) {
+    setStage('confirming')
+    setError('')
+    let executedHash: Hash | null = null
+    try {
+      const result = await completeSafePayment(session, batch, contract, proposed, {
+        onProgress: setSafeProgress,
+        onExecuted: (transactionHash) => {
+          executedHash = transactionHash
+          setHash(transactionHash)
+          window.history.replaceState(null, '', `?tx=${transactionHash}&payer=${session.address}`)
+        },
+      })
+      forgetPendingPayout(proposed)
+      setPayment(result)
+    } catch (cause) {
+      if (cause instanceof RevertedPaymentError || cause instanceof SafeCancelledError) forgetPendingPayout(proposed)
+      if (cause instanceof RevertedPaymentError) setFailed(true)
+      if (cause instanceof SafeCancelledError) {
+        clearSafeProposal()
+        setError(`${errorMessage(cause)}. You can review the payout and propose it again.`)
+        return
+      }
+      setError(
+        cause instanceof RevertedPaymentError
+          ? `Payment failed: ${errorMessage(cause)}. Check Arc Explorer before starting a new batch.`
+          : cause instanceof SafePendingError
+          ? `${errorMessage(cause)}. Use Check again after they do, or open the receipt link from the Safe's transaction history later.`
+          : executedHash
+          ? `Transaction executed but not verified yet: ${errorMessage(cause)}. Use Retry receipt below.`
+          : `Could not follow the Safe transaction: ${errorMessage(cause)}`,
+      )
+    } finally {
+      setStage('idle')
+    }
+  }
+
   async function retryReceipt() {
     if (!hash) return
     setStage('loading')
     setError('')
     try {
-      const result = await loadPayment(hash)
-      if (submittedBatch) assertMatchesReviewedBatch(result.payments, submittedBatch)
-      setPayment(result)
+      const result = await loadPayment(hash, safe?.address ?? linkedPayer)
+      const payments = submittedBatch ? matchingRun(result.runs, submittedBatch) : result.payments
+      if (safeTxHash) forgetPendingPayout(safeTxHash)
+      setPayment({ ...result, payments })
     } catch (cause) {
       if (cause instanceof RevertedPaymentError) setFailed(true)
       setError(`Could not verify receipt: ${errorMessage(cause)}`)
@@ -224,7 +359,7 @@ function App() {
     if (!hash) return
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}${window.location.pathname}?tx=${hash}`,
+        `${window.location.origin}${window.location.pathname}?tx=${hash}${payment?.executor ? `&payer=${payment.sender}` : ''}`,
       )
     } catch (cause) {
       setError(`Could not copy receipt link: ${errorMessage(cause)}`)
@@ -242,9 +377,9 @@ function App() {
           <a href="#how-it-works">How it works</a>
           <a href="https://docs.arc.io/" target="_blank" rel="noreferrer">Arc docs</a>
         </nav>
-        <button className="wallet-button" type="button" onClick={connect} disabled={busy}>
+        <button className="wallet-button" type="button" onClick={connect} disabled={busy || !!safe}>
           <span className="status-light" aria-hidden="true" />
-          {account ? shortAddress(account) : stage === 'connecting' ? 'Connecting...' : 'Connect wallet'}
+          {safe ? `Safe ${shortAddress(safe.address)}` : account ? shortAddress(account) : stage === 'connecting' ? 'Connecting...' : 'Connect wallet'}
         </button>
       </header>
 
@@ -270,7 +405,7 @@ function App() {
         <section id="workspace" className="workspace" aria-labelledby="workspace-heading">
           <div className="section-intro">
             <h2 id="workspace-heading">Create a payout</h2>
-            <p>Add recipients, check the total, then approve one Arc transaction in your own wallet.</p>
+            <p>{safe ? 'Add recipients, check the total, then propose one Arc transaction to your Safe.' : 'Add recipients, check the total, then approve one Arc transaction in your own wallet.'}</p>
           </div>
 
           <div className="workspace-grid">
@@ -364,32 +499,59 @@ function App() {
                 <span>Total to send</span>
                 <strong>{calculation.batch ? usdc(calculation.batch.total) : '0.00'} <small>USDC</small></strong>
               </div>
-              {quote && quoteFor === draftKey && (
+              {quote && quoteFor === draftKey && ('maxNetworkFee' in quote ? (
                 <div className="gas-detail">
                   <span>Wallet balance <b>{usdc(quote.balance)} USDC</b></span>
                   <span>Max estimated network fee <b>{usdc(quote.maxNetworkFee)} USDC</b></span>
                 </div>
-              )}
+              ) : (
+                <div className="gas-detail">
+                  <span>Safe balance <b>{usdc(quote.balance)} USDC</b></span>
+                  <span>Network fee <b>paid by the owner who executes it</b></span>
+                </div>
+              ))}
               <div className="review-actions">
                 {reviewed ? (
-                  <button type="button" className="primary-button" onClick={confirm} disabled={busy}>
-                    {stage === 'signing' ? 'Approve in your wallet...' : 'Confirm & pay'} <span aria-hidden="true">-&gt;</span>
+                  <button type="button" className="primary-button" onClick={confirm} disabled={busy || !!safe?.readOnly}>
+                    {safe
+                      ? stage === 'signing' ? 'Confirm in Safe...' : 'Propose in Safe'
+                      : stage === 'signing' ? 'Approve in your wallet...' : 'Confirm & pay'} <span aria-hidden="true">-&gt;</span>
                   </button>
                 ) : (
-                  <button type="button" className="primary-button" onClick={review} disabled={busy || !!hash || !calculation.batch || !account || !contractState.address}>
+                  <button type="button" className="primary-button" onClick={review} disabled={busy || !!hash || !!safeTxHash || !calculation.batch || !account || !contractState.address}>
                     {stage === 'reviewing' ? 'Checking Arc...' : 'Review batch'} <span aria-hidden="true">-&gt;</span>
                   </button>
                 )}
-                <p>Your wallet sends the total to the payout contract, which pays each recipient in the same transaction. If any payment fails, the whole batch reverts.</p>
+                <p>Your {safe ? 'Safe' : 'wallet'} sends the total to the payout contract, which pays each recipient in the same transaction. If any payment fails, the whole batch reverts.</p>
               </div>
+              {safeIssue && <p className="configuration-message" role="alert">{safeIssue}</p>}
+              {safe?.readOnly && (
+                <p className="configuration-message">{'Safe{Wallet} opened this Safe read-only. Connect an owner wallet in Safe{Wallet} to propose payouts.'}</p>
+              )}
               {contractState.error && <p className="configuration-message">{contractState.error}. Deploy and set VITE_ARC_BATCH_ADDRESS to enable payments.</p>}
             </aside>
           </div>
         </section>
 
-        {(error || hash || payment) && (
+        {(error || hash || payment || safeTxHash) && (
           <section className="result-area" aria-live="polite" ref={resultRef}>
             {error && <div className="error-banner" role="alert">{error}</div>}
+            {safeTxHash && !hash && !payment && (
+              <div className="pending-card">
+                <span className="tiny-label">Proposed in your Safe</span>
+                <h2>{safeProgress === 'awaiting-execution' ? 'Signed. Waiting for an owner to execute it.' : 'Waiting for the Safe owners to sign.'}</h2>
+                <p>The receipt appears here once the transaction runs on Arc. Do not propose this payout again.</p>
+                <div className="result-actions">
+                  <button
+                    type="button"
+                    onClick={() => safe && submittedBatch && contractState.address && followSafePayment(safe, safeTxHash, submittedBatch, contractState.address)}
+                    disabled={busy}
+                  >Check again</button>
+                  <button type="button" onClick={clearSafeProposal} disabled={busy}>Start a different payout</button>
+                  <button type="button" onClick={() => { forgetPendingPayout(safeTxHash); clearSafeProposal() }} disabled={busy}>Forget this proposal</button>
+                </div>
+              </div>
+            )}
             {hash && !payment && (
               <div className="pending-card">
                 <span className="tiny-label">{failed ? 'Transaction reverted' : 'Transaction submitted'}</span>
@@ -405,7 +567,7 @@ function App() {
               <div className="receipt-card" id="receipt">
                 <span className="tiny-label">Confirmed on Arc mainnet, block {payment.blockNumber.toString()}</span>
                 <h2>All payments confirmed</h2>
-                <p>Sender {shortAddress(payment.sender)} paid {recipientCount(payment.payments.length)} in one transaction.</p>
+                <p>Sender {shortAddress(payment.sender)} paid {recipientCount(payment.payments.length)} in one transaction.{payment.executor ? ` Executed by ${shortAddress(payment.executor)}.` : ''}</p>
                 <div className="receipt-list">
                   {payment.payments.map((item) => (
                     <div key={item.index}>

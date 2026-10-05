@@ -1,0 +1,6 @@
+{
+  "name": "Arc Payrun",
+  "description": "Pay up to 25 wallets in USDC from your Safe in one Arc transaction, with a receipt link anyone can check.",
+  "iconPath": "favicon.svg",
+  "icons": [{ "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" }]
+}

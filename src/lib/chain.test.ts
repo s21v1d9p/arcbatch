@@ -5,7 +5,9 @@ import {
   assertMatchesReviewedBatch,
   connectWallet,
   loadPayment,
+  matchingRun,
   preparePayment,
+  prepareSafePayment,
   publicClient,
   sendPayment,
 } from './chain'
@@ -35,6 +37,13 @@ describe('receipt vs reviewed batch', () => {
     expect(() =>
       assertMatchesReviewedBatch([{ recipient, amount: 1n, index: 0 }], batch),
     ).toThrow('do not match')
+  })
+
+  it('picks the payout that matches the reviewed batch out of several in one transaction', () => {
+    const other = [{ recipient: sender, amount: 5n, index: 0 }]
+    const ours = [{ recipient, amount: 1_000_000_000_000_000_000n, index: 0 }]
+    expect(matchingRun([other, ours], batch)).toEqual(ours)
+    expect(() => matchingRun([other], batch)).toThrow('do not match')
   })
 })
 
@@ -174,6 +183,49 @@ describe('mainnet payout quote', () => {
   })
 })
 
+describe('Safe payout quote', () => {
+  const safe = '0x4444444444444444444444444444444444444444' as const
+
+  it('dry-runs the payout from the Safe and only needs the Safe to hold the total', async () => {
+    vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
+    vi.spyOn(publicClient, 'getChainId').mockResolvedValue(5042)
+    vi.spyOn(publicClient, 'getCode').mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
+    vi.spyOn(publicClient, 'getBalance').mockResolvedValue(1_000_000_000_000_000_000n)
+    const dryRun = vi.spyOn(publicClient, 'estimateContractGas').mockResolvedValue(100_000n)
+
+    await expect(prepareSafePayment(batch, safe)).resolves.toEqual({
+      account: safe,
+      contract,
+      balance: 1_000_000_000_000_000_000n,
+    })
+    expect(dryRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: safe,
+        address: contract,
+        functionName: 'pay',
+        args: [[recipient], [1_000_000_000_000_000_000n]],
+        value: 1_000_000_000_000_000_000n,
+      }),
+    )
+  })
+
+  it('rejects a wrong chain, unverified code and a Safe that cannot cover the total', async () => {
+    vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
+    const chainId = vi.spyOn(publicClient, 'getChainId').mockResolvedValue(1)
+    await expect(prepareSafePayment(batch, safe)).rejects.toThrow('not connected to Arc mainnet')
+    chainId.mockResolvedValue(5042)
+    const code = vi.spyOn(publicClient, 'getCode').mockResolvedValue('0x6000')
+    await expect(prepareSafePayment(batch, safe)).rejects.toThrow('verified payout contract bytecode')
+    code.mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
+    vi.spyOn(publicClient, 'getBalance').mockResolvedValue(999_999_999_999_999_999n)
+    const dryRun = vi.spyOn(publicClient, 'estimateContractGas').mockResolvedValue(100_000n)
+    await expect(prepareSafePayment(batch, safe)).rejects.toThrow(
+      'Insufficient Arc USDC in the Safe: need 1 USDC, Safe has 0.999999999999999999 USDC',
+    )
+    expect(dryRun).not.toHaveBeenCalled()
+  })
+})
+
 describe('shared receipt verification', () => {
   it('refuses receipts from a configured address that is not the verified payout contract', async () => {
     vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
@@ -190,18 +242,102 @@ describe('shared receipt verification', () => {
     await expect(loadPayment(hash)).rejects.toThrow('No payout events')
   })
 
+  it('accepts a payout executed through a Safe and reports who executed it', async () => {
+    vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
+    const hash = `0x${'c'.repeat(64)}` as const
+    const safe = '0x4444444444444444444444444444444444444444' as const
+    const owner = '0x5555555555555555555555555555555555555555' as const
+    vi.spyOn(publicClient, 'getCode').mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
+    vi.spyOn(publicClient, 'getTransactionReceipt').mockResolvedValue({
+      status: 'success',
+      blockNumber: 9n,
+      from: owner,
+      to: safe,
+      logs: [
+        {
+          address: contract,
+          topics: [
+            toEventSelector('event Paid(address indexed sender, address indexed recipient, uint256 amount, uint256 index)'),
+            pad(safe),
+            pad(recipient),
+          ],
+          data: encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [1n, 0n]),
+        },
+      ],
+    } as never)
+
+    const result = await loadPayment(hash)
+    expect(result.sender).toBe(safe)
+    expect(result.executor).toBe(owner)
+    expect(result.payments).toEqual([{ recipient, amount: 1n, index: 0 }])
+    expect(result.runs).toEqual([[{ recipient, amount: 1n, index: 0 }]])
+    expect(result.blockNumber).toBe(9n)
+  })
+
+  it('keeps a shared receipt verifiable when a recipient contract pays others from inside the payout', async () => {
+    vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
+    const hash = `0x${'b'.repeat(64)}` as const
+    const reenterer = '0x5555555555555555555555555555555555555555' as const
+    const paidTopic = toEventSelector('event Paid(address indexed sender, address indexed recipient, uint256 amount, uint256 index)')
+    const log = (from: `0x${string}`, index: bigint) => ({
+      address: contract,
+      topics: [paidTopic, pad(from), pad(recipient)],
+      data: encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [7n, index]),
+    })
+    vi.spyOn(publicClient, 'getCode').mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
+    vi.spyOn(publicClient, 'getTransactionReceipt').mockResolvedValue({
+      status: 'success',
+      blockNumber: 3n,
+      from: sender,
+      to: contract,
+      logs: [log(sender, 0n), log(reenterer, 0n), log(sender, 1n)],
+    } as never)
+
+    const result = await loadPayment(hash)
+    expect(result.sender).toBe(sender)
+    expect(result.executor).toBeNull()
+    expect(result.payments).toEqual([
+      { recipient, amount: 7n, index: 0 },
+      { recipient, amount: 7n, index: 1 },
+    ])
+  })
+
+  it('verifies the payer named in a share link when a transaction holds payouts from several senders', async () => {
+    vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
+    const hash = `0x${'a'.repeat(64)}` as const
+    const safe = '0x4444444444444444444444444444444444444444' as const
+    const wrapper = '0x5555555555555555555555555555555555555555' as const
+    const paidTopic = toEventSelector('event Paid(address indexed sender, address indexed recipient, uint256 amount, uint256 index)')
+    const log = (from: `0x${string}`, amount: bigint) => ({
+      address: contract,
+      topics: [paidTopic, pad(from), pad(recipient)],
+      data: encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [amount, 0n]),
+    })
+    vi.spyOn(publicClient, 'getCode').mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
+    vi.spyOn(publicClient, 'getTransactionReceipt').mockResolvedValue({
+      status: 'success',
+      blockNumber: 4n,
+      from: sender,
+      to: wrapper,
+      logs: [log(safe, 500n), log(wrapper, 1n)],
+    } as never)
+
+    await expect(loadPayment(hash)).rejects.toThrow('more than one sender')
+    const result = await loadPayment(hash, safe)
+    expect(result.sender).toBe(safe)
+    expect(result.payments).toEqual([{ recipient, amount: 500n, index: 0 }])
+  })
+
   it('returns a checksummed sender for shareable receipts', async () => {
     vi.stubEnv('VITE_ARC_BATCH_ADDRESS', contract)
     const hash = `0x${'d'.repeat(64)}` as const
     const lowercaseSender = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
-    vi.spyOn(publicClient, 'getTransaction').mockResolvedValue({
-      to: contract,
-      from: lowercaseSender,
-    } as never)
     vi.spyOn(publicClient, 'getCode').mockResolvedValue(ARC_BATCH_RUNTIME_CODE)
     vi.spyOn(publicClient, 'getTransactionReceipt').mockResolvedValue({
       status: 'success',
       blockNumber: 1n,
+      from: lowercaseSender,
+      to: contract,
       logs: [
         {
           address: contract,
@@ -217,5 +353,6 @@ describe('shared receipt verification', () => {
 
     const result = await loadPayment(hash)
     expect(result.sender).toBe(getAddress(lowercaseSender))
+    expect(result.executor).toBeNull()
   })
 })
