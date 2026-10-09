@@ -107,7 +107,7 @@ Arc docs I used: [RPC endpoints](https://docs.arc.io/arc/references/rpc-endpoint
 
 - A memo or reference per batch, to match payouts with invoices or payroll
 - EURC payouts and a CSV export of receipts
-- Approval through a Safe or another multisig, and splitting longer lists across several transactions
+- Splitting longer lists across several transactions
 
 ## License
 
